@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales KPI Dashboard | Shubham Tambe</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root { --navy:#1d4e89; --teal:#14b8a6; --ink:#1a2433; --muted:#5b6678; --line:#e4e9f1; --soft:#f4f7fb; --red:#e07a5f; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif; color:var(--ink); background:var(--soft); }
+  header { background:var(--navy); color:#fff; padding:22px 28px; }
+  header h1 { margin:0; font-size:22px; }
+  header p { margin:4px 0 0; opacity:.85; font-size:14px; }
+  .wrap { max-width:1200px; margin:0 auto; padding:22px; }
+  .filters { display:flex; flex-wrap:wrap; gap:14px; align-items:end; background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:18px; }
+  .filters label { font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px; font-weight:600; }
+  select { padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; min-width:150px; background:#fff; }
+  button { padding:9px 14px; border:0; border-radius:8px; background:var(--navy); color:#fff; font-weight:600; cursor:pointer; }
+  button.ghost { background:#fff; color:var(--navy); border:1px solid var(--line); }
+  .kpis { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:18px; }
+  .kpi { background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px; }
+  .kpi span { font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+  .kpi strong { display:block; font-size:24px; margin-top:6px; color:var(--navy); }
+  .grid { display:grid; grid-template-columns:2fr 1fr; gap:14px; margin-bottom:14px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:18px; min-width:0; }
+  .card h2 { font-size:15px; margin:0 0 4px; color:var(--ink); }
+  .card p.q { font-size:13px; color:var(--muted); margin:0 0 12px; }
+  .chart { position:relative; height:280px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:600; font-size:12px; }
+  td.num, th.num { text-align:right; }
+  .note { font-size:12px; color:var(--muted); margin-top:10px; }
+  footer { text-align:center; color:var(--muted); font-size:12px; padding:20px; }
+  @media (max-width:900px) { .kpis { grid-template-columns:1fr 1fr; } .grid, .grid2 { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Sales KPI Dashboard</h1>
+  <p>Synthetic sales data, January 2023 to December 2025. Use the filters to explore revenue, profit and discounts.</p>
+</header>
+
+<div class="wrap">
+  <div class="filters">
+    <label>Year
+      <select id="fYear"></select>
+    </label>
+    <label>Region
+      <select id="fRegion"></select>
+    </label>
+    <label>Channel
+      <select id="fChannel"></select>
+    </label>
+    <button class="ghost" id="reset">Reset filters</button>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><span>Total revenue</span><strong id="kRev">-</strong></div>
+    <div class="kpi"><span>Total profit</span><strong id="kProfit">-</strong></div>
+    <div class="kpi"><span>Profit margin</span><strong id="kMargin">-</strong></div>
+    <div class="kpi"><span>Orders</span><strong id="kOrders">-</strong></div>
+    <div class="kpi"><span>Avg order value</span><strong id="kAov">-</strong></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Monthly revenue trend</h2>
+      <p class="q">Are we growing, and is the trend healthy?</p>
+      <div class="chart"><canvas id="cTrend"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Revenue by channel</h2>
+      <p class="q">Which channels drive results?</p>
+      <div class="chart"><canvas id="cChannel"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Revenue by region</h2>
+      <p class="q">Where is revenue coming from?</p>
+      <div class="chart"><canvas id="cRegion"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Profit margin by product</h2>
+      <p class="q">Which products earn the best margin?</p>
+      <div class="chart"><canvas id="cProduct"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Profit margin by discount band</h2>
+      <p class="q">Do deeper discounts still earn profit?</p>
+      <div class="chart"><canvas id="cDiscount"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Sales rep leaderboard</h2>
+      <p class="q">Who drives the most revenue?</p>
+      <table>
+        <thead><tr><th>Rep</th><th class="num">Revenue</th><th class="num">Margin</th><th class="num">Orders</th></tr></thead>
+        <tbody id="repRows"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <p class="note">All data is synthetic and generated for this portfolio project. Figures update when you change a filter.</p>
+</div>
+
+<footer>Built by Shubham Tambe · Business Analyst, Data &amp; Reporting</footer>
+
+<script>
+const DATA = __DATA__;
+const COLS = DATA.cols;
+const ROWS = DATA.rows.map(r => Object.fromEntries(COLS.map((c, i) => [c, r[i]])));
+
+const money = v => '$' + Math.round(v).toLocaleString('en-US');
+const compact = v => v >= 1e6 ? '$' + (v / 1e6).toFixed(2) + 'M' : v >= 1e3 ? '$' + (v / 1e3).toFixed(0) + 'K' : '$' + Math.round(v);
+const pct = v => (isFinite(v) ? v : 0).toFixed(1) + '%';
+const uniq = k => [...new Set(ROWS.map(r => r[k]))].sort();
+
+// Fill filter dropdowns
+function fill(id, values, allLabel) {
+  const el = document.getElementById(id);
+  el.innerHTML = '';
+  el.add(new Option(allLabel, 'all'));
+  values.forEach(v => el.add(new Option(v, v)));
+}
+fill('fYear', [...new Set(ROWS.map(r => r.date.slice(0, 4)))].sort(), 'All years');
+fill('fRegion', uniq('region'), 'All regions');
+fill('fChannel', uniq('channel'), 'All channels');
+
+const NAVY = '#1d4e89', TEAL = '#14b8a6', CORAL = '#e07a5f', GREY = '#9aa6b8';
+const charts = {};
+function chart(id, config) {
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id), config);
+}
+
+function agg(rows, keyFn) {
+  const m = {};
+  rows.forEach(r => {
+    const k = keyFn(r);
+    m[k] = m[k] || { revenue: 0, profit: 0, orders: 0 };
+    m[k].revenue += r.revenue; m[k].profit += r.profit; m[k].orders += 1;
+  });
+  return m;
+}
+
+function filtered() {
+  const y = document.getElementById('fYear').value;
+  const g = document.getElementById('fRegion').value;
+  const c = document.getElementById('fChannel').value;
+  return ROWS.filter(r => (y === 'all' || r.date.startsWith(y)) &&
+                          (g === 'all' || r.region === g) &&
+                          (c === 'all' || r.channel === c));
+}
+
+function render() {
+  const rows = filtered();
+  const rev = rows.reduce((s, r) => s + r.revenue, 0);
+  const profit = rows.reduce((s, r) => s + r.profit, 0);
+
+  document.getElementById('kRev').textContent = compact(rev);
+  document.getElementById('kProfit').textContent = compact(profit);
+  document.getElementById('kMargin').textContent = pct(profit / rev * 100);
+  document.getElementById('kOrders').textContent = rows.length.toLocaleString('en-US');
+  document.getElementById('kAov').textContent = money(rev / rows.length);
+
+  // Monthly trend with 3-month average
+  const monthly = agg(rows, r => r.date.slice(0, 7));
+  const months = Object.keys(monthly).sort();
+  const revs = months.map(m => monthly[m].revenue);
+  const avg3 = revs.map((_, i) => i < 2 ? null : (revs[i] + revs[i - 1] + revs[i - 2]) / 3);
+  chart('cTrend', {
+    type: 'line',
+    data: { labels: months, datasets: [
+      { label: 'Monthly revenue', data: revs, borderColor: NAVY, backgroundColor: 'rgba(29,78,137,.08)', fill: true, tension: .25, pointRadius: 0 },
+      { label: '3-month average', data: avg3, borderColor: TEAL, borderWidth: 3, pointRadius: 0, tension: .3 }
+    ]},
+    options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } },
+      scales: { y: { ticks: { callback: v => compact(v) } } } }
+  });
+
+  // Channel doughnut
+  const ch = agg(rows, r => r.channel);
+  chart('cChannel', {
+    type: 'doughnut',
+    data: { labels: Object.keys(ch), datasets: [{ data: Object.values(ch).map(v => v.revenue),
+      backgroundColor: [NAVY, TEAL, GREY] }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+  });
+
+  // Region bars
+  const rg = agg(rows, r => r.region);
+  const rgKeys = Object.keys(rg).sort((a, b) => rg[b].revenue - rg[a].revenue);
+  chart('cRegion', {
+    type: 'bar',
+    data: { labels: rgKeys, datasets: [{ label: 'Revenue', data: rgKeys.map(k => rg[k].revenue), backgroundColor: NAVY }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { y: { ticks: { callback: v => compact(v) } } } }
+  });
+
+  // Product margin bars
+  const pr = agg(rows, r => r.product);
+  const prKeys = Object.keys(pr).sort();
+  chart('cProduct', {
+    type: 'bar',
+    data: { labels: prKeys, datasets: [{ label: 'Margin %', data: prKeys.map(k => pr[k].profit / pr[k].revenue * 100), backgroundColor: TEAL }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { y: { ticks: { callback: v => v + '%' } } } }
+  });
+
+  // Discount band margin
+  const band = r => r.discount <= 5 ? '0-5%' : r.discount <= 10 ? '5-10%' : r.discount <= 20 ? '10-20%' : '20-30%';
+  const db = agg(rows, band);
+  const dbKeys = ['0-5%', '5-10%', '10-20%', '20-30%'].filter(k => db[k]);
+  chart('cDiscount', {
+    type: 'bar',
+    data: { labels: dbKeys, datasets: [{ label: 'Margin %', data: dbKeys.map(k => db[k].profit / db[k].revenue * 100),
+      backgroundColor: dbKeys.map((_, i) => i === 3 ? CORAL : NAVY) }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { y: { ticks: { callback: v => v + '%' } } } }
+  });
+
+  // Rep leaderboard
+  const rp = agg(rows, r => r.rep);
+  const tbody = document.getElementById('repRows');
+  tbody.innerHTML = Object.keys(rp)
+    .sort((a, b) => rp[b].revenue - rp[a].revenue)
+    .map(k => `<tr><td>${k}</td><td class="num">${money(rp[k].revenue)}</td>` +
+              `<td class="num">${pct(rp[k].profit / rp[k].revenue * 100)}</td>` +
+              `<td class="num">${rp[k].orders}</td></tr>`).join('');
+}
+
+['fYear', 'fRegion', 'fChannel'].forEach(id => document.getElementById(id).addEventListener('change', render));
+document.getElementById('reset').addEventListener('click', () => {
+  ['fYear', 'fRegion', 'fChannel'].forEach(id => document.getElementById(id).value = 'all');
+  render();
+});
+render();
+</script>
+</body>
+</html>
